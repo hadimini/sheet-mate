@@ -26,9 +26,9 @@ services:
   django:
     build: .
     command: python django_app/manage.py runserver 0.0.0.0:8001
-#    volumes:
-#      - ./django_app:/app/django_app
-#      - static_volume:/app/django_app/staticfiles
+    volumes:
+      - .:/app
+      - static_volume:/app/django_app/staticfiles
     ports:
       - "8001:8001"
     environment:
@@ -54,8 +54,8 @@ services:
   fastapi:
     build: .
     command: uvicorn fastapi_app.main:app --host 0.0.0.0 --port 8000 --reload
-#    volumes:
-#      - ./fastapi_app:/app/fastapi_app
+    volumes:
+      - .:/app
     ports:
       - "8000:8000"
     environment:
@@ -91,4 +91,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-#  static_volume:
+  static_volume:
