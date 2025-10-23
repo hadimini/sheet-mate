@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Database
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker (optional - if you want to keep compose file)
+# docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+
+# Project-specific
+/nginx/ssl/          # SSL certificates (never commit these!)
+/nginx/logs/         # Nginx logs
+
+# Docker development files
+docker-compose.dev.yml
+docker-compose.prod.yml
+
+# Temporary files
+tmp/
+temp/
