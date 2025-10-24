@@ -30,7 +30,6 @@ async def lifespan(app: FastAPI):
 
     if telegram_bot:
         await telegram_bot.application.stop()
-        print("\n\n\n Telegram Bot stoppeddddd")
         logger.info('Telegram Bot stopped')
 
 app = FastAPI(
