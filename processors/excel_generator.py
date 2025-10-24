@@ -1,11 +1,8 @@
 import calendar
-import os
-import tempfile
-from datetime import datetime, timedelta
-
-import pandas as pd
+from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.styles import Font, Alignment
+import tempfile
 
 
 class TimeSheetGenerator:
@@ -14,100 +11,82 @@ class TimeSheetGenerator:
         self.month = self.current_date.month
         self.year = self.current_date.year
 
-    def _apply_styling(self, ws) -> None:
-        """Apply styling to worksheet"""
-        # Set columns width
-        for col in range(1, 50):
-            ws.column_dimensions[chr(64 + col)].width = 10
-
-        # Base border
-        thin_border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
-
-        # Apply borders to data area
-        for row in range(1, 20):
-            for col in range(1, 40):
-                cell = ws.cell(row=row, column=col)
-                cell.border = thin_border
-
-    def _build_timesheet_structure(self, ws, employee_name: str, calendar_data: dict) -> None:
-        """Build timesheet structure"""
-        # Title
-        ws.merge_cells('A1:H1')
-        ws['A1'] = f'Employee Timesheet - {calendar_data["month_name"]} {calendar_data["year"]}'
-        ws['A1'].font = Font(size=14, bold=True)
-        ws['A1'].alignment = Alignment(horizontal='center')
-
-        # Employee info
-        ws['A3'] = 'Employee:'
-        ws['B3'] = employee_name
-        ws['A4'] = 'Employee ID:'
-        ws['B4'] = 'employee_id'
-        ws['A5'] = 'Period:'
-        ws['B5'] = f'{calendar_data["month_name"]} {calendar_data["year"]}'
-
-    def _generate_calendar_data(self) -> dict:
-        """Generates calendar data from first day of the month"""
-        month_name = calendar.month_name[self.month]
-        first_day = datetime(self.year, self.month, 1)
-        total_days = calendar.monthrange(self.year, self.month)[1]
-
-        days_in_month = []
-        day_details = []
-        weeks = []
-        current_week = []
-
-        for day in range(1, total_days + 1):
-            current_date = datetime(self.year, self.month, day)
-            dya_of_week = current_date.weekday()
-            is_weekend = dya_of_week >= 5
-
-            days_in_month.append(day)
-            day_details.append({
-                'day': current_date,
-                'date_of_week': dya_of_week,
-                'is_weekend': is_weekend,
-            })
-
-            current_week.append(day)
-
-            if dya_of_week == 6 or day == total_days:
-                weeks.append(current_week)
-                current_week = []
-
-        if current_week:
-            weeks.append(current_week)
-
-        return {
-            'month_name': month_name,
-            'year': self.year,
-            'days': days_in_month,
-            'day_details': day_details,
-            'weeks': weeks,
-        }
-
     async def generate_timesheet(self, employee_name: str) -> str:
-        """Generates a timesheet Excel file"""
-        # Create workbook
-        wb = Workbook()
-        ws = wb.active
-        ws.title = f'Timesheet {self.month}-{self.year}'
+        """Generates a clean, simple timesheet Excel file"""
+        try:
+            print(f"📊 Generating timesheet for {employee_name}...")
 
-        # Calendar data
-        calendar_data: dict = self._generate_calendar_data()
+            # Create workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = 'Timesheet'
 
-        # Build structure
-        self._build_timesheet_structure(ws, employee_name, calendar_data)
+            # SIMPLE HEADER
+            ws['A1'] = f"Timesheet - {employee_name}"
+            ws['A1'].font = Font(size=14, bold=True)
 
-        # Apply styling
-        self._apply_styling(ws)
+            ws['A2'] = f"Period: {calendar.month_name[self.month]} {self.year}"
+            ws['A2'].font = Font(bold=True)
 
-        # Save to temp file
-        file_path = f"/tmp/{employee_name}_{self.month}_{self.year}.xlsx"
-        wb.save(file_path)
+            # SIMPLE TABLE HEADERS
+            headers = ['Date', 'Day', 'Regular Hours', 'Overtime Hours', 'Total Hours']
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=4, column=col, value=header)
+                cell.font = Font(bold=True)
 
-        return file_path
+            # FILL DATES FOR THE MONTH
+            total_days = calendar.monthrange(self.year, self.month)[1]
+            day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+            current_row = 5
+            for day in range(1, total_days + 1):
+                current_date = datetime(self.year, self.month, day)
+                day_name = day_names[current_date.weekday()]
+                is_weekend = current_date.weekday() >= 5
+
+                # Date
+                ws.cell(row=current_row, column=1, value=current_date.strftime('%Y-%m-%d'))
+
+                # Day name
+                ws.cell(row=current_row, column=2, value=day_name)
+
+                # Sample hours (8 for weekdays, 0 for weekends)
+                regular_hours = 0 if is_weekend else 8
+                ws.cell(row=current_row, column=3, value=regular_hours)
+
+                # Overtime (sample: 1 hour on Fridays)
+                overtime_hours = 1 if current_date.weekday() == 4 else 0  # Friday
+                ws.cell(row=current_row, column=4, value=overtime_hours)
+
+                # Total
+                ws.cell(row=current_row, column=5, value=regular_hours + overtime_hours)
+
+                current_row += 1
+
+            # AUTO-ADJUST COLUMN WIDTHS
+            for column in ws.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                ws.column_dimensions[column_letter].width = adjusted_width
+
+            # SAVE FILE
+            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
+                file_path = tmp_file.name
+
+            wb.save(file_path)
+            print(f"✅ Timesheet saved: {file_path}")
+
+            return file_path
+
+        except Exception as e:
+            print(f"❌ Error: {str(e)}")
+            import traceback
+            print(f"🔍 Details: {traceback.format_exc()}")
+            raise
