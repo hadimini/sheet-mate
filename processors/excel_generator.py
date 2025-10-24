@@ -1,7 +1,7 @@
 import calendar
 from datetime import datetime
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
+from openpyxl.styles import Font, Alignment, PatternFill
 import tempfile
 
 
@@ -28,56 +28,43 @@ class TimeSheetGenerator:
             ws['A2'] = f"Period: {calendar.month_name[self.month]} {self.year}"
             ws['A2'].font = Font(bold=True)
 
-            # SIMPLE TABLE HEADERS
-            headers = ['Date', 'Day', 'Regular Hours', 'Overtime Hours', 'Total Hours']
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=4, column=col, value=header)
+            headers = [
+                'Regular hours', 'Overtime hours', 'Vacation hours', 'Sick hours', 'Holiday hours'
+            ]
+
+            for row, header in enumerate(headers, 6):
+                cell = ws.cell(row=row, column=1, value=header)
                 cell.font = Font(bold=True)
 
             # FILL DATES FOR THE MONTH
             total_days = calendar.monthrange(self.year, self.month)[1]
             day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-            current_row = 5
             for day in range(1, total_days + 1):
+                align_center = Alignment(horizontal='center')
+                font_bold = Font(bold=True)
+                col_offset = 4
                 current_date = datetime(self.year, self.month, day)
                 day_name = day_names[current_date.weekday()]
                 is_weekend = current_date.weekday() >= 5
 
                 # Date
-                ws.cell(row=current_row, column=1, value=current_date.strftime('%Y-%m-%d'))
+                day_number_cell = ws.cell(row=4, column=col_offset + day, value=current_date.strftime('%d'))
+                day_number_cell.alignment = align_center
+                day_number_cell.font = font_bold
+                day_name_cell = ws.cell(row=5, column=col_offset + day, value=day_name)
+                day_name_cell.alignment = align_center
+                day_name_cell.font = font_bold
 
-                # Day name
-                ws.cell(row=current_row, column=2, value=day_name)
+                if is_weekend:
+                    fill = PatternFill(fill_type='solid', fgColor='808080')
+                    day_number_cell.fill = fill
+                    day_name_cell.fill = fill
 
-                # Sample hours (8 for weekdays, 0 for weekends)
-                regular_hours = 0 if is_weekend else 8
-                ws.cell(row=current_row, column=3, value=regular_hours)
+                    for r in range(6, 11):
+                        ws.cell(row=r, column=col_offset + day).fill = fill
 
-                # Overtime (sample: 1 hour on Fridays)
-                overtime_hours = 1 if current_date.weekday() == 4 else 0  # Friday
-                ws.cell(row=current_row, column=4, value=overtime_hours)
-
-                # Total
-                ws.cell(row=current_row, column=5, value=regular_hours + overtime_hours)
-
-                current_row += 1
-
-            # AUTO-ADJUST COLUMN WIDTHS
-            for column in ws.columns:
-                max_length = 0
-                column_letter = column[0].column_letter
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = (max_length + 2)
-                ws.column_dimensions[column_letter].width = adjusted_width
-
-            # SAVE FILE
-            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
+            with tempfile.NamedTemporaryFile(suffix='.xlsx') as tmp_file:
                 file_path = tmp_file.name
 
             wb.save(file_path)
