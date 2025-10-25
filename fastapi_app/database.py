@@ -14,7 +14,7 @@ engine = create_async_engine(
     poolclass=QueuePool,
     max_overflow=20,
 )
-AsyncSessionLocal = async_sessionmaker(engine=engine, expire_on_commit=False, class_=AsyncSession)
+AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
