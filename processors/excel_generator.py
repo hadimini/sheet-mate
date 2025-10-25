@@ -14,7 +14,7 @@ class TimeSheetGenerator:
     async def generate_timesheet(self, employee_name: str) -> str:
         """Generates a clean, simple timesheet Excel file"""
         try:
-            print(f"📊 Generating timesheet for {employee_name}...")
+            print(f'📊 Generating timesheet for {employee_name}...')
 
             # Create workbook
             wb = Workbook()
@@ -22,10 +22,10 @@ class TimeSheetGenerator:
             ws.title = 'Timesheet'
 
             # SIMPLE HEADER
-            ws['A1'] = f"Timesheet - {employee_name}"
+            ws['A1'] = f'Timesheet - {employee_name}'
             ws['A1'].font = Font(size=14, bold=True)
 
-            ws['A2'] = f"Period: {calendar.month_name[self.month]} {self.year}"
+            ws['A2'] = f'Period: {calendar.month_name[self.month]} {self.year}'
             ws['A2'].font = Font(bold=True)
 
             headers = [
@@ -64,16 +64,16 @@ class TimeSheetGenerator:
                     for r in range(6, 11):
                         ws.cell(row=r, column=col_offset + day).fill = fill
 
-            with tempfile.NamedTemporaryFile(suffix='.xlsx') as tmp_file:
+            with tempfile.NamedTemporaryFile(prefix=f'time_sheet_{self.month}_{self.year}_', suffix='.xlsx') as tmp_file:
                 file_path = tmp_file.name
 
             wb.save(file_path)
-            print(f"✅ Timesheet saved: {file_path}")
+            print(f'✅ Timesheet saved: {file_path}')
 
             return file_path
 
         except Exception as e:
-            print(f"❌ Error: {str(e)}")
+            print(f'❌ Error: {str(e)}')
             import traceback
-            print(f"🔍 Details: {traceback.format_exc()}")
+            print(f'🔍 Details: {traceback.format_exc()}')
             raise
