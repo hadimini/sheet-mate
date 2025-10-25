@@ -64,12 +64,11 @@ class TelegramBot:
 
     async def timesheet_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /timesheet command - generate and send Excel file"""
-        chat_id = update.effective_chat.id
+        user = update.effective_user
+        employee = await self.employee_service.get_employee_by_telegram_id(telegram_id=str(user.id))
 
         try:
-            file_path = await self.time_sheet_generator.generate_timesheet(
-                employee_name=f'User_{chat_id}',
-            )
+            file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name)
 
             # Send file via telegram
             with open(file_path, 'rb') as f:

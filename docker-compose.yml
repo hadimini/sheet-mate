@@ -98,7 +98,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    
+
 #  celery_app:
 #    build: .
 #    command: celery -A celery_app worker --loglevel=info
