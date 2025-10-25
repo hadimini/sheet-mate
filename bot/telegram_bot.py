@@ -98,7 +98,7 @@ class TelegramBot:
                 f'📄 Received your timesheet: {file_name}\n\n'
                 f'Processing your timesheet...'
             )
-            # TODO: Add your timesheet processing logic here
+            # TODO: Add timesheet processing logic
         else:
             await update.message.reply_text(
                 '❌ Please send an Excel file (.xlsx or .xls)'
