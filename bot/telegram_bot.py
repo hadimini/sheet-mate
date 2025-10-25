@@ -12,12 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
-    def __init__(self, token: str):
+    def __init__(self, token: str, webhook_url: str | None = None):
         self.token = token
+        self.webhook_url = webhook_url
         self.application = Application.builder().token(token).build()
         self.time_sheet_generator = TimeSheetGenerator()
         self.employee_service = EmployeeService()
         self.set_up_handlers()
+        self._initialized = False  # Track initialization state
 
     def set_up_handlers(self):
         """Set up Telegram bot command handlers"""
@@ -136,52 +138,46 @@ class TelegramBot:
         else:
             # Handle other regular messages
             await update.message.reply_text(
-                "I didn't understand that. Use /start to begin or /timesheet for your timesheet."
+                'I didn\'t understand that. Use /start to begin or /timesheet for your timesheet.'
             )
 
-    async def start_bot(self):
-        """Start the bot polling"""
-        logger.info("Starting Telegram bot...")
+    async def setup_webhook(self):
+        """Setup webhook with Telegram"""
+        if not self.webhook_url:
+            raise ValueError('Webhook URL not set')
+
+        # Initialize the application first
         await self.application.initialize()
         await self.application.start()
-        await self.application.updater.start_polling()
+        self._initialized = True
 
-        # Keep the bot running
-        logger.info("Bot is now running...")
-        while True:
-            await asyncio.sleep(3600)  # Sleep for 1 hour
+        # Remove any existing webhook first to avoid conflicts
+        await self.application.bot.delete_webhook()
+        await asyncio.sleep(1)  # Brief pause
 
-    async def stop_bot(self):
-        """Stop the bot gracefully"""
-        await self.application.updater.stop()
-        await self.application.stop()
-        await self.application.shutdown()
+        # Set new webhook
+        await self.application.bot.set_webhook(
+            url=self.webhook_url,
+            drop_pending_updates=True  # Clear any pending updates
+        )
+        logger.info(f'Webhook URL set to {self.webhook_url}')
 
+    async def remove_webhook(self):
+        """Remove webhook from Telegram"""
+        await self.application.bot.delete_webhook()
+        logger.info('Webhook removed')
 
-async def main():
-    """Main function to start the bot"""
-    token = os.getenv('TELEGRAM_BOT_TOKEN')
-    if not token:
-        logger.error("TELEGRAM_BOT_TOKEN environment variable is not set")
-        return
+        # Shutdown the application
+        if self._initialized:
+            await self.application.stop()
+            await self.application.shutdown()
+            self._initialized = False
 
-    bot = TelegramBot(token)
+    async def process_update(self, update_data: dict):
+        """Process incoming webhook update"""
+        if not self._initialized:
+            logger.error('Bot not initialized - cannot process update')
+            return
 
-    try:
-        await bot.start_bot()
-    except KeyboardInterrupt:
-        logger.info("Received stop signal, shutting down...")
-        await bot.stop_bot()
-    except Exception as e:
-        logger.error(f"Bot crashed: {e}")
-        await bot.stop_bot()
-
-
-if __name__ == '__main__':
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-
-    asyncio.run(main())
+        update = Update.de_json(update_data, self.application.bot)
+        await self.application.process_update(update)
