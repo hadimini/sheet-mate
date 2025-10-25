@@ -5,7 +5,7 @@ from django_app.employees.models import Employee, WorkHours
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('name', )
+    list_display = ('name', 'email', 'telegram_id', 'created_at')
 
 
 @admin.register(WorkHours)
