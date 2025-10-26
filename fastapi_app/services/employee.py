@@ -33,9 +33,7 @@ class EmployeeService:
                 await db.execute(insert_stmt)
                 await db.commit()
 
-                # Fetch the new employee
-                result = await db.execute(stmt)
-                new_employee = result.fetchone()
+                new_employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
                 return new_employee
 
             except Exception as e:
@@ -63,17 +61,15 @@ class EmployeeService:
                 update_stmt = (
                     employees_table.update()
                     .where(employees_table.c.telegram_id == telegram_id)
-                    .values(
-                        email=email,
-                    )
+                    .values(email=email)
                 )
                 await db.execute(update_stmt)
                 await db.commit()
 
-                # Return updated employee
+                # **FIX: Re-query to get updated employee**
+                stmt = select(employees_table).where(employees_table.c.telegram_id == telegram_id)
                 result = await db.execute(stmt)
                 return result.fetchone()
-
             except IntegrityError:
                 await db.rollback()
                 logger.error(f'Email already exists: {email}')
