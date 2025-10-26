@@ -49,30 +49,25 @@ class EmployeeService:
                 if not self._is_valid_email(email):
                     raise ValueError('Invalid email format')
 
-                employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
-
-                if not employee:
-                    raise ValueError('Employee not found')
-
-                # Update email
                 update_stmt = (
                     employees_table.update()
                     .where(employees_table.c.telegram_id == telegram_id)
                     .values(email=email)
+                    .returning(employees_table) # returns the updated row
                 )
-                await db.execute(update_stmt)
-                await db.commit()
+                result = await db.execute(update_stmt)
+                updated_employee = result.fetchone()
 
-                updated_employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
+                if not updated_employee:
+                    raise ValueError('Employee not found')
+
+                await db.commit()
                 return updated_employee
+
             except IntegrityError:
                 await db.rollback()
                 logger.error(f'Email already exists: {email}')
                 raise ValueError('Email already registered')
-            except ValueError as e:
-                await db.rollback()
-                logger.error(f'Validation error in update_employee_email: {e}')
-                raise
             except Exception as e:
                 await db.rollback()
                 logger.error(f'Error in update_employee_email: {e}')
