@@ -67,7 +67,7 @@ class RedisService:
             logger.error(f'Redis delete error for pattern: {pattern}: {e}')
             return False
 
-    async def set(self, key: str, value: Any, expire_seconds: int = 3600) -> bool:
+    async def set(self, *, key: str, value: Any, expire_seconds: int = 3600) -> bool:
         """Set value to cache with expiration"""
         try:
             if not self.client:
