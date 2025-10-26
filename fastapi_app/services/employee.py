@@ -49,10 +49,7 @@ class EmployeeService:
                 if not self._is_valid_email(email):
                     raise ValueError('Invalid email format')
 
-                # Check if employee exists
-                stmt = select(employees_table).where(employees_table.c.telegram_id == telegram_id)
-                result = await db.execute(stmt)
-                employee = result.fetchone()
+                employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
 
                 if not employee:
                     raise ValueError('Employee not found')
@@ -66,10 +63,8 @@ class EmployeeService:
                 await db.execute(update_stmt)
                 await db.commit()
 
-                # **FIX: Re-query to get updated employee**
-                stmt = select(employees_table).where(employees_table.c.telegram_id == telegram_id)
-                result = await db.execute(stmt)
-                return result.fetchone()
+                updated_employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
+                return updated_employee
             except IntegrityError:
                 await db.rollback()
                 logger.error(f'Email already exists: {email}')
