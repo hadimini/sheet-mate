@@ -1,25 +1,71 @@
 import asyncio
 import logging
 import os
+from typing import Optional
 
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, CommandHandler
 
 from fastapi_app.services.employee import EmployeeService
+from fastapi_app.services.employee_cache_service import EmployeeCacheService
 from processors.excel_generator import TimeSheetGenerator
 
 logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
-    def __init__(self, token: str, webhook_url: str | None = None):
+
+    def __init__(self, token: str, webhook_url: str | None = None, redis_service=None):
         self.token = token
         self.webhook_url = webhook_url
         self.application = Application.builder().token(token).build()
-        self.time_sheet_generator = TimeSheetGenerator()
+
         self.employee_service = EmployeeService()
+        self.redis_service = redis_service
+        self.time_sheet_generator = TimeSheetGenerator()
+
         self.set_up_handlers()
         self._initialized = False  # Track initialization state
+
+    def _get_employee_cache_service(self) -> Optional[EmployeeCacheService]:
+        """Get employee cache service if Redis is available"""
+        if hasattr(self, '_employee_cache_service'):
+            return self._employee_cache_service
+
+        if self.redis_service:
+            self._employee_cache_service = EmployeeCacheService(
+                redis_service=self.redis_service,
+                employee_service=self.employee_service
+            )
+            return self._employee_cache_service
+        return None
+
+    async def _get_employee_data(self, telegram_id: str, name: str):
+        """Get employee data using cache if available"""
+        cache_service = self._get_employee_cache_service()
+
+        if cache_service:
+            return await cache_service.get_or_create_employee(telegram_id=telegram_id, name=name)
+        else:
+            return await self.employee_service.get_or_create_employee(telegram_id=telegram_id, name=name)
+
+    async def _get_employee_by_telegram_id(self, telegram_id: str):
+        """Get employee by telegram id using cache if available"""
+        cache_service = self._get_employee_cache_service()
+
+        if cache_service:
+            return await cache_service.get_employee_by_telegram_id(telegram_id=telegram_id)
+        else:
+            return await self.employee_service.get_employee_by_telegram_id(telegram_id=telegram_id)
+
+    async def _update_employee_email(self, telegram_id: str, email: str):
+        """Update employee email using cache if available"""
+        cache_service = self._get_employee_cache_service()
+
+        if cache_service:
+            return await cache_service.update_employee_email(telegram_id=telegram_id, email=email)
+        else:
+            return await self.employee_service.update_employee_email(telegram_id=telegram_id, email=email)
 
     def set_up_handlers(self):
         """Set up Telegram bot command handlers"""
@@ -35,7 +81,7 @@ class TelegramBot:
         name = f'{user.first_name} {user.last_name or ""}'.strip()
 
         try:
-            employee = await self.employee_service.get_or_create_employee(
+            employee = await self._get_employee_data(
                 telegram_id=telegram_id,
                 name=name
             )
@@ -49,7 +95,7 @@ class TelegramBot:
                 )
                 # Store state to expect email next
                 context.user_data['awaiting_email'] = True
-                context.user_data['telegram_id'] = telegram_id  # ← THIS WAS MISSING
+                context.user_data['telegram_id'] = telegram_id
             else:
                 welcome_message = (
                     f'Welcome back, {user.first_name}! 👋\n\n'
@@ -67,10 +113,14 @@ class TelegramBot:
     async def timesheet_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /timesheet command - generate and send Excel file"""
         user = update.effective_user
-        employee = await self.employee_service.get_employee_by_telegram_id(telegram_id=str(user.id))
 
         try:
-            file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name)
+            employee = await self._get_employee_by_telegram_id(telegram_id=str(user.id))
+            if not employee:
+                await update.message.reply_text('❌ Employee not found. Please use /start first.')
+                return
+
+            file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name or '')
 
             # Send file via telegram
             with open(file_path, 'rb') as f:
@@ -108,13 +158,10 @@ class TelegramBot:
         """Handle regular messages including email collection"""
         if context.user_data.get('awaiting_email'):
             email_text = update.message.text.strip()
+            telegram_id = context.user_data.get('telegram_id')
 
             try:
-                # This will now validate the email and handle errors
-                await self.employee_service.update_employee_email(
-                    telegram_id=context.user_data['telegram_id'],
-                    email=email_text
-                )
+                await self._update_employee_email(telegram_id, email_text)
 
                 await update.message.reply_text(
                     f'Perfect! ✅\n\n'
@@ -124,7 +171,9 @@ class TelegramBot:
 
                 # Clear the state
                 context.user_data['awaiting_email'] = False
-                del context.user_data['telegram_id']
+
+                if 'telegram_id' in context.user_data:
+                    del context.user_data['telegram_id']
 
             except ValueError as e:
                 await update.message.reply_text(
