@@ -2,7 +2,7 @@ import logging
 import re
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from fastapi_app.database import AsyncSessionLocal
@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 class EmployeeService:
 
-    async def get_or_create_employee(self, *, telegram_id: str, name: str):
+    async def get_or_create_employee(self, telegram_id: str, name: str):
         """Get existing employee by telegram id or create new one"""
+
         async with AsyncSessionLocal() as db:
             try:
                 employee = await self.get_employee_by_telegram_id(telegram_id=telegram_id)
@@ -41,7 +42,7 @@ class EmployeeService:
                 logger.error(f'Error in get_or_create_employee: {e}')
                 raise
 
-    async def update_employee_email(self, *, telegram_id: str, email: str):
+    async def update_employee_email(self, telegram_id: str, email: str):
         """Update employee email with validation"""
         async with AsyncSessionLocal() as db:
             try:
@@ -78,7 +79,7 @@ class EmployeeService:
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(pattern, email) is not None
 
-    async def get_employee_by_telegram_id(self, *, telegram_id: str):
+    async def get_employee_by_telegram_id(self, telegram_id: str):
         '''Get employee by telegram ID'''
         async with AsyncSessionLocal() as db:
             try:
