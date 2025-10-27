@@ -22,62 +22,75 @@ class EmployeeCacheService:
             self,
             telegram_id: str,
             fetch_func: callable,
-            *fetch_args,
             **fetch_kwargs
     ) -> Optional[Any]:
-        """Generic method to get data with caching"""
         cache_key = self._get_employee_cache_key(telegram_id)
 
         # Try cache first
-        cached_employee = await self.redis_service.get(cache_key)
-        if cached_employee:
+        cached_data = await self.redis_service.get(cache_key)
+
+        if cached_data:
             logger.info(f'Cache hit for employee {telegram_id}')
-            return cached_employee
+            return cached_data
 
         # Cache miss - get from service
         logger.info(f'Cache miss for employee {telegram_id}')
-        employee = await fetch_func(*fetch_args, **fetch_kwargs)
+        employee = await fetch_func(telegram_id=telegram_id, **fetch_kwargs)
 
         # Cache the result
         if employee:
+            # Convert Row object to dict for proper caching
+            employee_dict = self._row_to_dict(employee)
             await self.redis_service.set(
-                cache_key,
-                employee,
+                key=cache_key,
+                value=employee_dict,  # Store as dict instead of Row
                 expire_seconds=self.EMPLOYEE_CACHE_TTL
             )
             logger.info(f'Cached employee {telegram_id}')
 
-        return employee
+        return employee  # Return original Row object, not the dict
+
+    def _row_to_dict(self, row):
+        """Convert SQLAlchemy Row object to dictionary"""
+        if hasattr(row, '_asdict'):
+            # It's a Row object with _asdict method
+            return row._asdict()
+        elif hasattr(row, '_fields'):
+            # It's a namedtuple-like object
+            return {field: getattr(row, field) for field in row._fields}
+        elif isinstance(row, (tuple, list)):
+            # It's a plain tuple - convert to dict with column names
+            # You'll need to know your column names for this
+            columns = ['id', 'name', 'email', 'telegram_id', 'is_active', 'created_at']
+            return dict(zip(columns, row))
+        else:
+            # Return as-is if we can't convert
+            return row
 
     async def get_or_create_employee(
             self,
-            *,
             telegram_id: str,
             name: str
     ) -> Optional[Any]:
         """Get or create employee with caching"""
         return await self._get_with_caching(
-            telegram_id,
-            self.employee_service.get_or_create_employee,
             telegram_id=telegram_id,
+            fetch_func=self.employee_service.get_or_create_employee,
             name=name
         )
 
     async def get_employee_by_telegram_id(
             self,
-            *,
             telegram_id: str
     ) -> Optional[Any]:
         """Get employee by telegram ID with caching"""
         return await self._get_with_caching(
-            telegram_id,
-            self.employee_service.get_employee_by_telegram_id,
-            telegram_id=telegram_id
+            telegram_id=telegram_id,
+            fetch_func=self.employee_service.get_employee_by_telegram_id,
         )
 
     async def update_employee_email(
             self,
-            *,
             telegram_id: str,
             email: str
     ) -> Optional[Any]:
