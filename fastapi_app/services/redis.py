@@ -31,7 +31,7 @@ class RedisService:
         try:
             if not self.client:
                 await self.connect()
-
+            await self.delete(key)
             if value := await self.client.get(key):
                 return json.loads(value)
             return None
@@ -68,12 +68,16 @@ class RedisService:
             return False
 
     async def set(self, *, key: str, value: Any, expire_seconds: int = 3600) -> bool:
-        """Set value to cache with expiration"""
+        """Set value in cache with expiration"""
         try:
             if not self.client:
                 await self.connect()
 
-            await self.client.set(name=key, value=json.dumps(value, default=str), ex=expire_seconds)
+            await self.client.setex(
+                key,
+                expire_seconds,
+                json.dumps(value, default=str)
+            )
             return True
 
         except Exception as e:
