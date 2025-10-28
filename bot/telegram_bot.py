@@ -47,8 +47,7 @@ class TelegramBot:
 
         if cache_service:
             return await cache_service.get_or_create_employee(telegram_id=telegram_id, name=name)
-        else:
-            return await self.employee_service.get_or_create_employee(telegram_id=telegram_id, name=name)
+        return await self.employee_service.get_or_create_employee(telegram_id=telegram_id, name=name)
 
     async def _get_employee_by_telegram_id(self, telegram_id: str):
         """Get employee by telegram id using cache if available"""
@@ -56,8 +55,7 @@ class TelegramBot:
 
         if cache_service:
             return await cache_service.get_employee_by_telegram_id(telegram_id=telegram_id)
-        else:
-            return await self.employee_service.get_employee_by_telegram_id(telegram_id=telegram_id)
+        return await self.employee_service.get_employee_by_telegram_id(telegram_id=telegram_id)
 
     async def _update_employee_email(self, telegram_id: str, email: str):
         """Update employee email using cache if available"""
@@ -65,10 +63,9 @@ class TelegramBot:
 
         if cache_service:
             return await cache_service.update_employee_email(telegram_id=telegram_id, email=email)
-        else:
-            return await self.employee_service.update_employee_email(telegram_id=telegram_id, email=email)
+        return await self.employee_service.update_employee_email(telegram_id=telegram_id, email=email)
 
-    async def _get_timesheet_cache_service(self):
+    def _get_timesheet_cache_service(self):
         """Get timesheet cache service if Redis is available"""
         if hasattr(self, '_timesheet_cache_service'):
             return self._timesheet_cache_service
@@ -87,7 +84,6 @@ class TelegramBot:
 
         if cache_service:
             return await cache_service.generate_timesheet(employee_name=employee_name)
-
         return await self.time_sheet_generator.generate_timesheet(employee_name=employee_name)
 
     def set_up_handlers(self):
@@ -139,12 +135,16 @@ class TelegramBot:
 
         try:
             employee = await self._get_employee_by_telegram_id(telegram_id=str(user.id))
+
             if not employee:
                 await update.message.reply_text('❌ Employee not found. Please use /start first.')
                 return
 
-            # file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name or '')
-            file_path = await self._generate_timesheet(employee_name=employee.name or '')
+            if isinstance(employee, dict):
+                employee_name = employee.get('name')
+            else:
+                employee_name = employee.name
+            file_path = await self._generate_timesheet(employee_name=employee_name)
 
             # Send file via telegram
             with open(file_path, 'rb') as f:
