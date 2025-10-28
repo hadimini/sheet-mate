@@ -53,18 +53,16 @@ class EmployeeCacheService:
     def _row_to_dict(self, row):
         """Convert SQLAlchemy Row object to dictionary"""
         if hasattr(row, '_asdict'):
-            # It's a Row object with _asdict method
+            # Row object with _asdict method
             return row._asdict()
         elif hasattr(row, '_fields'):
-            # It's a namedtuple-like object
+            # Namedtuple-like object
             return {field: getattr(row, field) for field in row._fields}
         elif isinstance(row, (tuple, list)):
             # It's a plain tuple - convert to dict with column names
-            # You'll need to know your column names for this
             columns = ['id', 'name', 'email', 'telegram_id', 'is_active', 'created_at']
             return dict(zip(columns, row))
         else:
-            # Return as-is if we can't convert
             return row
 
     async def get_or_create_employee(
@@ -105,8 +103,8 @@ class EmployeeCacheService:
             # Refresh cache with updated data
             cache_key = self._get_employee_cache_key(telegram_id)
             await self.redis_service.set(
-                cache_key,
-                updated_employee,
+                key=cache_key,
+                value=updated_employee,
                 expire_seconds=self.EMPLOYEE_CACHE_TTL
             )
             logger.info(f'Refreshed cache for updated employee {telegram_id}')
@@ -124,7 +122,6 @@ class EmployeeCacheService:
             logger.info(f'Invalidated cache for employee {telegram_id}')
         return success
 
-    # Optional: Keep this if you need explicit cache invalidation
     async def invalidate_employee_cache(self, telegram_id: str) -> bool:
         """Public method to invalidate cache for specific employee"""
         return await self._invalidate_cache(telegram_id)
