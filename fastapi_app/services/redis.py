@@ -31,7 +31,6 @@ class RedisService:
         try:
             if not self.client:
                 await self.connect()
-            await self.delete(key)
             if value := await self.client.get(key):
                 return json.loads(value)
             return None
