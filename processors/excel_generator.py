@@ -1,9 +1,11 @@
 import calendar
 import logging
+import os
+import tempfile
 from datetime import datetime
+
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class TimeSheetGenerator:
         self.month = self.current_date.month
         self.year = self.current_date.year
 
-    async def generate_timesheet(self, employee_name: str) -> str:
+    async def generate_timesheet(self, employee_name: str | None = None) -> str:
         """
         Generates a clean, simple timesheet Excel file
 
@@ -28,7 +30,7 @@ class TimeSheetGenerator:
             Path to generated Excel file
         """
         try:
-            logger.info(f'📊 Generating timesheet for {employee_name}...')
+            logger.info(f'📊 Generating timesheet')
 
             # Create workbook
             wb = Workbook()
@@ -36,7 +38,7 @@ class TimeSheetGenerator:
             ws.title = 'Timesheet'
 
             # SIMPLE HEADER
-            ws['A1'] = f'Timesheet - {employee_name}'
+            ws['A1'] = f'Timesheet - {employee_name}' if employee_name else 'Timesheet'
             ws['A1'].font = Font(size=14, bold=True)
 
             ws['A2'] = f'Period: {calendar.month_name[self.month]} {self.year}'
@@ -78,11 +80,16 @@ class TimeSheetGenerator:
                     for r in range(6, 11):
                         ws.cell(row=r, column=col_offset + day).fill = fill
 
+            # Use tempfile dir but with a specific file name
             with tempfile.NamedTemporaryFile(
-                    prefix=f'Time_sheet_{employee_name.replace(" ", "_")}_{self.month}_{self.year}_',
-                    suffix='.xlsx'
+                    suffix='.xlsx',
+                    delete=False,
+                    dir=tempfile.gettempdir()
             ) as tmp_file:
-                file_path = tmp_file.name
+                filename = f'Timesheet_{self.month:02}_{self.year}.xlsx'
+                # rename tmp file to filename
+                file_path = os.path.join(tempfile.gettempdir(), filename)
+                os.rename(tmp_file.name, file_path)
 
             wb.save(file_path)
             logger.info(f'✅ Timesheet saved: {file_path}')
