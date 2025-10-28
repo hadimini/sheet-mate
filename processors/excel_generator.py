@@ -9,13 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 class TimeSheetGenerator:
+    """Generates Excel timesheet templates for employee time tracking."""
+
     def __init__(self) -> None:
+        """Initialize with current date settings."""
         self.current_date = datetime.now()
         self.month = self.current_date.month
         self.year = self.current_date.year
 
     async def generate_timesheet(self, employee_name: str) -> str:
-        """Generates a clean, simple timesheet Excel file"""
+        """
+        Generates a clean, simple timesheet Excel file
+
+        Args:
+            employee_name (str): Employee name for timesheet header
+
+        Returns:
+            Path to generated Excel file
+        """
         try:
             logger.info(f'📊 Generating timesheet for {employee_name}...')
 
