@@ -8,6 +8,7 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes, Com
 
 from fastapi_app.services.employee import EmployeeService
 from fastapi_app.services.employee_cache_service import EmployeeCacheService
+from fastapi_app.services.timesheet_cache_service import TimesheetCacheService
 from processors.excel_generator import TimeSheetGenerator
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,28 @@ class TelegramBot:
         else:
             return await self.employee_service.update_employee_email(telegram_id=telegram_id, email=email)
 
+    async def _get_timesheet_cache_service(self):
+        """Get timesheet cache service if Redis is available"""
+        if hasattr(self, '_timesheet_cache_service'):
+            return self._timesheet_cache_service
+
+        if self.redis_service:
+            self._timesheet_cache_service = TimesheetCacheService(
+                redis_service=self.redis_service,
+                timesheet_generator=self.time_sheet_generator
+            )
+            return self._timesheet_cache_service
+        return None
+
+    async def _generate_timesheet(self, employee_name: str):
+        """Generate timesheet using cache if available"""
+        cache_service = self._get_timesheet_cache_service()
+
+        if cache_service:
+            return await cache_service.generate_timesheet(employee_name=employee_name)
+
+        return await self.time_sheet_generator.generate_timesheet(employee_name=employee_name)
+
     def set_up_handlers(self):
         """Set up Telegram bot command handlers"""
         self.application.add_handler(CommandHandler('start', self.start_command))
@@ -120,7 +143,8 @@ class TelegramBot:
                 await update.message.reply_text('❌ Employee not found. Please use /start first.')
                 return
 
-            file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name or '')
+            # file_path = await self.time_sheet_generator.generate_timesheet(employee_name=employee.name or '')
+            file_path = await self._generate_timesheet(employee_name=employee.name or '')
 
             # Send file via telegram
             with open(file_path, 'rb') as f:
